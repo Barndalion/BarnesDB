@@ -5,6 +5,7 @@
 typedef struct{
     char *keyword;
     char **data;
+    int data_count;
 }QueryToken;
 
 typedef struct{
@@ -28,7 +29,10 @@ typedef struct{
    int table_count;
 }Database;
 
-void parse_query(char *query){
+QueryToken *tokens;
+int token_count = 0;
+
+QueryToken *parse_query(char *query){
     char *token = strtok(query, " ");
     while(token != NULL){
         char *startbracket = strchr(token,'(');
@@ -44,14 +48,27 @@ void parse_query(char *query){
         strncpy(data,startbracket + 1, data_len - 1);
         data[data_len - 1] = '\0';
 
+        int data_count = 0;
+
         QueryToken qt;
         qt.keyword = keyword;
+        qt.data = NULL;
         char *data_token = strtok(data, ",");
         while(data_token != NULL){
-            
+            qt.data = realloc(qt.data, sizeof(char*) * (data_count + 1));
+            qt.data[data_count++] = strdup(data_token);
         }
-        qt.data = data;
+        qt.data_count = data_count;
+        tokens = realloc(tokens, sizeof(QueryToken) * (token_count + 1));
+        tokens[token_count++] = qt;
+
+        free(data);
+        free(keyword);
+        free(data_token);
+
+        token = strtok(NULL, " ");
     }
+    return tokens;
 }
 
 Database parse_file(FILE *fp){
