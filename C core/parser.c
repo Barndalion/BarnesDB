@@ -32,18 +32,42 @@ typedef struct{
 QueryToken *tokens;
 int token_count = 0;
 
-QueryToken *parse_query(char *query){
-    char *token = strtok(query, " ");
+QueryToken *parse_query(char *query_input){
+
+    token_count = 0;
+    free(tokens);
+    tokens = NULL;
+
+    if (query_input == NULL) {
+    fprintf(stderr, "Query is NULL!\n");
+    return NULL;
+    }
+    printf("Parsing query: %s\n", query_input);
+
+    char *query = strdup(query_input);
+    if (!query) {
+        perror("strdup");
+        return NULL;
+    }
+
+    printf("Query after strdup: %s\n", query);
+    char *saveptr2;
+    char *token = strtok_r(query, " ", &saveptr2);
     while(token != NULL){
         char *startbracket = strchr(token,'(');
         char *endbracket = strchr(token,')');
+
+        if (!startbracket || !endbracket || startbracket >= endbracket) {
+            token = strtok_r(NULL, " ", &saveptr2);
+            continue;
+        }
 
         int keyword_len = startbracket - token;
         char *keyword = malloc(keyword_len + 1);
         strncpy(keyword,token,keyword_len);
         keyword[keyword_len] = '\0';
 
-        int data_len = endbracket - startbracket;
+        int data_len = endbracket - startbracket ;
         char *data = malloc(data_len + 1);
         strncpy(data,startbracket + 1, data_len - 1);
         data[data_len - 1] = '\0';
@@ -53,21 +77,21 @@ QueryToken *parse_query(char *query){
         QueryToken qt;
         qt.keyword = keyword;
         qt.data = NULL;
-        char *data_token = strtok(data, ",");
+        char *saveptr;
+        char *data_token = strtok_r(data, ",", &saveptr);
         while(data_token != NULL){
             qt.data = realloc(qt.data, sizeof(char*) * (data_count + 1));
             qt.data[data_count++] = strdup(data_token);
+            data_token = strtok_r(NULL, ",", &saveptr);
         }
         qt.data_count = data_count;
+
         tokens = realloc(tokens, sizeof(QueryToken) * (token_count + 1));
         tokens[token_count++] = qt;
 
-        free(data);
-        free(keyword);
-        free(data_token);
-
-        token = strtok(NULL, " ");
+        token = strtok_r(NULL, " ", &saveptr2);
     }
+    
     return tokens;
 }
 
@@ -194,6 +218,17 @@ void print_database(Database db) {
     }
 }
 
+void print_tokens(QueryToken *tokens, int token_count) {
+    for (int i = 0; i < token_count; i++) {
+        printf("Keyword: %s\n", tokens[i].keyword);
+        printf("Data: ");
+        for (int j = 0; j < tokens[i].data_count; j++) {
+            printf("%s, ", tokens[i].data[j]);
+        }
+        printf("\n");
+    }
+}
+
 
 int main(){
     FILE *fp = fopen("MyDB.txt", "r");
@@ -202,23 +237,28 @@ int main(){
         return 1;
     }
 
-    Database db = parse_file(fp);
-    Table *t = get_table(&db, "tablename");
-    Column *c = get_column(t, "column1");
+    char query[] = "FROM(tablename) FIELDNAME(column1) RETRIEVE(data) CONDITION(==,data)";
+    QueryToken *a = parse_query(query);
+    print_tokens(a, token_count);
+    
 
-    printf("Table: %s\n", t->tablename);
-    for(int i = 0; i < t->column_count; i++){
-        printf("Colums in the table above: %s\n", t->columns[i].columnname);
-    }
-    printf("Column: %s\n", c->columnname);
-    for(int i = 0; i < c->data_count; i++){
-        if(strcmp(c->datatype, "int") == 0 || strcmp(c->datatype, "float") == 0){
-            printf("Data: %g\n", c->data.int_data[i]);
-        } else {
-            printf("Data: %s\n", c->data.data[i]);
-        }
-    }
-    // print_database(db);
+    // Database db = parse_file(fp);
+    // Table *t = get_table(&db, "tablename");
+    // Column *c = get_column(t, "column1");
+
+    // printf("Table: %s\n", t->tablename);
+    // for(int i = 0; i < t->column_count; i++){
+    //     printf("Colums in the table above: %s\n", t->columns[i].columnname);
+    // }
+    // printf("Column: %s\n", c->columnname);
+    // for(int i = 0; i < c->data_count; i++){
+    //     if(strcmp(c->datatype, "int") == 0 || strcmp(c->datatype, "float") == 0){
+    //         printf("Data: %g\n", c->data.int_data[i]);
+    //     } else {
+    //         printf("Data: %s\n", c->data.data[i]);
+    //     }
+    // }
+    // // print_database(db);
 
     // char *query = "SELECT * FROM table_name WHERE column_name = 'value'";
     // parse_query(query);
