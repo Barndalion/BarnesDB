@@ -3,6 +3,11 @@
 #include <string.h>
 
 typedef struct{
+    char *keyword;
+    char **data;
+}QueryToken;
+
+typedef struct{
     char *columnname;
     union{
         char **data;
@@ -24,9 +29,29 @@ typedef struct{
 }Database;
 
 void parse_query(char *query){
-    for(int i = 0;i <= sizeof(query);i++){
-        printf("%c \n",query[i]);
-    }   
+    char *token = strtok(query, " ");
+    while(token != NULL){
+        char *startbracket = strchr(token,'(');
+        char *endbracket = strchr(token,')');
+
+        int keyword_len = startbracket - token;
+        char *keyword = malloc(keyword_len + 1);
+        strncpy(keyword,token,keyword_len);
+        keyword[keyword_len] = '\0';
+
+        int data_len = endbracket - startbracket;
+        char *data = malloc(data_len + 1);
+        strncpy(data,startbracket + 1, data_len - 1);
+        data[data_len - 1] = '\0';
+
+        QueryToken qt;
+        qt.keyword = keyword;
+        char *data_token = strtok(data, ",");
+        while(data_token != NULL){
+            
+        }
+        qt.data = data;
+    }
 }
 
 Database parse_file(FILE *fp){
