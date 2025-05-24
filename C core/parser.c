@@ -5,7 +5,7 @@
 
 QueryToken *parse_query(char *query_input){
 
-    token_count = 0;
+    int token_count = 0;
     free(tokens);
     tokens = NULL;
 
@@ -98,8 +98,8 @@ Database parse_file(FILE *fp){
 
             int datatype_len = datatypeend - datatypestart;
             char *datatype = malloc(datatype_len + 1);
-            strncpy(datatype,datatypestart + 1, datatype_len - 1);
-            datatype[datatype_len - 1] = '\0';
+            strncpy(datatype,datatypestart+1, datatype_len-1);
+            datatype[datatype_len-1] = '\0';
 
             int name_len = datatypestart - (line+1);
             char *column_name = malloc(name_len + 1);
@@ -148,22 +148,11 @@ Database parse_file(FILE *fp){
     return db;
 }
 
-Table* get_table(Database *db, char *tablename){
-    for(int i = 0; i < db->table_count; i++){
-        if(strcmp(db->tables[i].tablename, tablename) == 0){
-            return &db->tables[i];
-        }
-    }
-    return NULL;
-}
-Column* get_column(Table *table, char *columnname){
-    for(int i = 0; i < table->column_count; i++){
-        if(strcmp(table->columns[i].columnname, columnname) == 0){
-            return &table->columns[i];
-        }
-    }
-    return NULL;
-}
+// void RETRIEVE(char *table_name, char *column_name, char *select_data){
+//     if(table_name != NULL){
+
+//     }
+// }
 
 void print_database(Database db) {
     for (int i = 0; i < db.table_count; i++) {
@@ -171,7 +160,7 @@ void print_database(Database db) {
         printf("Table: %s\n", t.tablename);
         for (int j = 0; j < t.column_count; j++) {
             Column c = t.columns[j];
-            printf("  Column: %s {%s} => ", c.columnname, c.datatype);
+            printf("  Column: %s | Datatype: %s => ", c.columnname, c.datatype);
             if (strcmp(c.datatype, "int") == 0 || strcmp(c.datatype, "float") == 0) {
                 for (int k = 0; k < c.data_count; k++) {
                     printf("%g", c.data.int_data[k]);
@@ -198,42 +187,4 @@ void print_tokens(QueryToken *tokens, int token_count) {
         }
         printf("\n");
     }
-}
-
-
-int main(){
-    FILE *fp = fopen("MyDB.txt", "r");
-    if (!fp) {
-        perror("Failed to open file");
-        return 1;
-    }
-
-    char query[] = "FROM(tablename) FIELDNAME(column1) RETRIEVE(data) CONDITION(==,data)";
-    QueryToken *a = parse_query(query);
-    print_tokens(a, token_count);
-    
-
-    // Database db = parse_file(fp);
-    // Table *t = get_table(&db, "tablename");
-    // Column *c = get_column(t, "column1");
-
-    // printf("Table: %s\n", t->tablename);
-    // for(int i = 0; i < t->column_count; i++){
-    //     printf("Colums in the table above: %s\n", t->columns[i].columnname);
-    // }
-    // printf("Column: %s\n", c->columnname);
-    // for(int i = 0; i < c->data_count; i++){
-    //     if(strcmp(c->datatype, "int") == 0 || strcmp(c->datatype, "float") == 0){
-    //         printf("Data: %g\n", c->data.int_data[i]);
-    //     } else {
-    //         printf("Data: %s\n", c->data.data[i]);
-    //     }
-    // }
-    // // print_database(db);
-
-    // char *query = "SELECT * FROM table_name WHERE column_name = 'value'";
-    // parse_query(query);
-
-    fclose(fp);
-    return 0;
 }

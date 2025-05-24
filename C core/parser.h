@@ -30,7 +30,7 @@ typedef struct{
 }Database;
 
 QueryToken *tokens;
-int token_count = 0;
+extern int token_count;
 
 QueryToken *parse_query(char *query_input);
 Database parse_file(FILE *fp);
