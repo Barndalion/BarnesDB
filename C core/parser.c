@@ -3,23 +3,12 @@
 #include <string.h>
 #include "parser.h"
 
-QueryToken *parse_query(char *query_input){
+token_lib *parse_query(char *query){
 
-    int token_count = 0;
-    free(tokens);
-    tokens = NULL;
+    token_lib *token_arr = malloc(sizeof(token_lib));
 
-    if (query_input == NULL) {
-    fprintf(stderr, "Query is NULL!\n");
-    return NULL;
-    }
-    printf("Parsing query: %s\n", query_input);
-
-    char *query = strdup(query_input);
-    if (!query) {
-        perror("strdup");
-        return NULL;
-    }
+    token_arr->tokens = malloc(sizeof(QueryToken));
+    token_arr->token_count = 0;
 
     printf("Query after strdup: %s\n", query);
     char *saveptr2;
@@ -28,15 +17,15 @@ QueryToken *parse_query(char *query_input){
         char *startbracket = strchr(token,'(');
         char *endbracket = strchr(token,')');
 
-        if (!startbracket || !endbracket || startbracket >= endbracket) {
-            token = strtok_r(NULL, " ", &saveptr2);
-            continue;
-        }
-
         int keyword_len = startbracket - token;
         char *keyword = malloc(keyword_len + 1);
         strncpy(keyword,token,keyword_len);
         keyword[keyword_len] = '\0';
+
+        if (!startbracket || !endbracket || startbracket >= endbracket) {
+            token = strtok_r(NULL, " ", &saveptr2);
+            continue;
+        }
 
         int data_len = endbracket - startbracket ;
         char *data = malloc(data_len + 1);
@@ -46,24 +35,28 @@ QueryToken *parse_query(char *query_input){
         int data_count = 0;
 
         QueryToken qt;
+        int capacity = 2;
         qt.keyword = keyword;
-        qt.data = NULL;
+        qt.data = malloc(sizeof(char*));
         char *saveptr;
-        char *data_token = strtok_r(data, ",", &saveptr);
+        char *data_token = strtok_r(data, " ", &saveptr);
         while(data_token != NULL){
-            qt.data = realloc(qt.data, sizeof(char*) * (data_count + 1));
+            if (data_count + 1 > capacity) {;
+                    qt.data = realloc(qt.data, sizeof(char*) * capacity);
+                    capacity *= 2;
+                }
             qt.data[data_count++] = strdup(data_token);
             data_token = strtok_r(NULL, ",", &saveptr);
         }
         qt.data_count = data_count;
 
-        tokens = realloc(tokens, sizeof(QueryToken) * (token_count + 1));
-        tokens[token_count++] = qt;
+        token_arr->tokens = realloc(token_arr->tokens, sizeof(QueryToken) * (token_arr->token_count + 1));
+        token_arr->tokens[token_arr->token_count++] = qt;
 
         token = strtok_r(NULL, " ", &saveptr2);
     }
     
-    return tokens;
+    return token_arr;
 }
 
 Database parse_file(FILE *fp){
@@ -123,18 +116,16 @@ Database parse_file(FILE *fp){
                 token = strtok(NULL, ",");
             }
             Column col;
+           
             col.columnname = column_name;
-            col.data_count = data_count;
+            
             col.datatype = datatype;
+            col.data = malloc(sizeof(char*) * data_count);
 
-            if(strcmp(datatype,"int") == 0 || strcmp(datatype, "float") == 0){
-                col.data.int_data = malloc(sizeof(double) * data_count);
-                for(int i = 0;i < data_count;i++){
-                    col.data.int_data[i] = strtod(data_array[i],NULL);
-                }
-            }else{
-                col.data.data = data_array;
+            for (int i = 0; i < data_count;i++){
+                col.data[i] = strdup(data_array[i]);
             }
+            col.data_count = data_count;
 
             current_table.columns = realloc(current_table.columns,sizeof(Column) * (current_table.column_count + 1));
             current_table.columns[current_table.column_count++] = col;
@@ -148,11 +139,6 @@ Database parse_file(FILE *fp){
     return db;
 }
 
-// void RETRIEVE(char *table_name, char *column_name, char *select_data){
-//     if(table_name != NULL){
-
-//     }
-// }
 
 void print_database(Database db) {
     for (int i = 0; i < db.table_count; i++) {
@@ -161,22 +147,15 @@ void print_database(Database db) {
         for (int j = 0; j < t.column_count; j++) {
             Column c = t.columns[j];
             printf("  Column: %s | Datatype: %s => ", c.columnname, c.datatype);
-            if (strcmp(c.datatype, "int") == 0 || strcmp(c.datatype, "float") == 0) {
-                for (int k = 0; k < c.data_count; k++) {
-                    printf("%g", c.data.int_data[k]);
-                    if (k < c.data_count - 1) printf(", ");
-                }
-            } else {
-                for (int k = 0; k < c.data_count; k++) {
-                    printf("%s", c.data.data[k]);
-                    if (k < c.data_count - 1) printf(", ");
-                }
+            for (int k = 0; k < c.data_count; k++) {
+                printf("%s, ", c.data[k]);
             }
             printf("\n");
         }
-        printf("\n");
     }
+        printf("\n");
 }
+
 
 void print_tokens(QueryToken *tokens, int token_count) {
     for (int i = 0; i < token_count; i++) {

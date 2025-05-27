@@ -1,42 +1,9 @@
 #include "parser.h"
+#include "dbops.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-Table* get_table(Database *db, char *tablename){
-    for(int i = 0; i < db->table_count; i++){
-        if(strcmp(db->tables[i].tablename, tablename) == 0){
-            return &db->tables[i];
-        }
-    }
-    return NULL;
-}
-Column* get_column(Table *table, char *columnname){
-    for(int i = 0; i < table->column_count; i++){
-        if(strcmp(table->columns[i].columnname, columnname) == 0){
-            return &table->columns[i];
-        }
-    }
-    return NULL;
-}
-void get_index_data(int index, char *table_name){
-    
-    FILE *fp = fopen("MyDB.txt", "r");
-    if (!fp) {
-        perror("Failed to open file");
-        return 1;
-    }
-    Database db = parse_file(fp);
-    Table *t = get_table(&db, table_name);
-    for(int i = 0;i < t->column_count;i++){
-        Column *c = &t[i];
-        for(int j = 0;j < c->data_count;j++){
-            if(extract_index(c->data.data[j]) == index){
-              
-            }
-        } 
-    }
-}
 int extract_index(char *data){
     char* index_start = strchr(data, '(');
     char* index_end = strchr(data, ')');
@@ -54,40 +21,79 @@ int extract_index(char *data){
     } 
 }
 
-void RETRIEVE(char *fp,char *select_data, char *From_table, char *Field_name){
+Table* get_table(Database *db, char *tablename){
+    for(int i = 0; i < db->table_count; i++){
+        if(strcmp(db->tables[i].tablename, tablename) == 0){
+            return &db->tables[i];
+        }
+    }
+    return NULL;
+}
+Column* get_column(Table *table, char *columnname){
+    for(int i = 0; i < table->column_count; i++){
+        if(strcmp(table->columns[i].columnname, columnname) == 0){
+            return &table->columns[i];
+        }
+    }
+    return NULL;
+}
+char** get_index_data(int index, char *table_name){
+    
     FILE *fp = fopen("MyDB.txt", "r");
     if (!fp) {
         perror("Failed to open file");
-        return 1;
+        return NULL;
     }
+    
     Database db = parse_file(fp);
+    Table *t = get_table(&db, table_name);
+    char **data = malloc((t->column_count +1) * sizeof(char*));
+    for(int i = 0;i < t->column_count;i++){
+        data[i] = NULL; // Initialize to NULL
+        Column *c = &t->columns[i];
+        for(int j = 0;j < c->data_count;j++){
+            if(extract_index(c->data[j]) == index){
+                data[i] = c->data[j];
+            }
+        } 
+    }
+    data[t->column_count] = NULL; 
+    fclose(fp);
+    return data;
+}
+
+
+retrieve_data RETRIEVE(char *filename,char *select_data, char *From_table, char *Field_name){
+    retrieve_data result;
+
+    FILE *pp = fopen(filename, "r");
+    if (!pp) {
+        perror("Failed to open file");
+        result.type = RETURN_TYPE_TABLE; // Default to RETURN_TYPE_TABLE for error handling
+        result.data.table = NULL; // Set to NULL to indicate failure
+        return result; // Return an empty result on failure
+    }
+    Database db = parse_file(pp);
     char *endptr;
     if(From_table == NULL && Field_name == NULL){
         Table *t = get_table(&db, select_data);
-        return t;
+        result.type = RETURN_TYPE_TABLE;
+        result.data.table = t;
+        return result;
     }
     if(From_table != NULL && Field_name == NULL){
         Table *t = get_table(&db, From_table);
         Column *c = get_column(t,select_data);
-        return c;
+        result.type = RETURN_TYPE_COLUMN;
+        result.data.column = c;
+        return result;
     }
     if(From_table != NULL && Field_name != NULL){
         Table *t = get_table(&db, From_table);
         Column *c = get_column(t, Field_name);
         
-        for(int i = 0; i < c->data_count;i++){
-            if(strcmp(c->datatype,"int")==0 || strcmp(c->datatype,"float")==0){
-                int val = strtod(select_data, &endptr);
-                if(*endptr == '\0'){ // Check if conversion was successful
-                    if(c->data.int_data[i] == val){
-                        
-                        printf("Match found: %g\n", c->data.int_data[i]);
-                    }
-                }
-                if(c->data.int_data[i] == )
-            }
-        }
+        result.type = RETURN_TYPE_ARRAY;
+        result.data.array = malloc(t->column_count * sizeof(char*));
     }
- 
 }
 

@@ -10,10 +10,7 @@ typedef struct{
 
 typedef struct{
     char *columnname;
-    union{
-        char **data;
-        double *int_data;
-    }data;
+    char **data;
     int data_count;
     char *datatype;
 }Column;
@@ -29,10 +26,12 @@ typedef struct{
    int table_count;
 }Database;
 
-QueryToken *tokens;
-extern int token_count;
+typedef struct{
+    QueryToken *tokens;
+    int token_count;
+}token_lib;
 
-QueryToken *parse_query(char *query_input);
+token_lib *parse_query(char *query_input);
 Database parse_file(FILE *fp);
 void print_tokens(QueryToken *tokens, int token_count);
 void print_database(Database db);

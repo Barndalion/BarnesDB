@@ -15,30 +15,22 @@ int main(){
     // QueryToken *a = parse_query(query);
     // print_tokens(a, token_count);
     
-    Database db = parse_file(fp);
-    print_database(db);
-    
-    char *tablename = "tablename";
-    char *columnname = "column1";
+    // Database db = parse_file(fp);
+    // print_database(db);
 
-    Table *t = get_table(&db, tablename);
-    Column *c = get_column(t,columnname);
+    // char *ann = "list(5000)";
+    // int index = extract_index(ann);
+    // printf("Extracted index: %d\n", index);
 
-    printf("Table: %s\n", t->tablename);
-    for(int i = 0; i < t->column_count; i++){
-        printf("Colums in the table above: %s\n", t->columns[i].columnname);
-    }
-    printf("Column: %s\n", c->columnname);
-    for(int i = 0; i < c->data_count; i++){
-        if(strcmp(c->datatype, "int") == 0 || strcmp(c->datatype, "float") == 0){
-            printf("Data: %g\n", c->data.int_data[i]);
-        } else {
-            printf("Data: %s\n", c->data.data[i]);
+    char **data = get_index_data(1,"tablename");
+    if (data) {
+        for (int i = 0; data[i] != NULL; i++) {
+            printf("Data at index 1: %s\n", data[i]);
         }
+        free(data);
+    } else {
+        printf("No data found for the specified index.\n");
     }
-
-
-  
 
     fclose(fp);
     return 0;
