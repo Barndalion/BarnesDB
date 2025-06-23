@@ -1,0 +1,5 @@
+Capacity 8
+tablename column1 3
+tablename column2 3
+tablename2 column1 3
+tablename2 column2 3
