@@ -155,35 +155,53 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
     while(fgets(buffer,sizeof(buffer),fp)){
         if(buffer[0] == '#'){
             printf("table was found\n");
+            long raw_buffer_len = strlen(buffer);
             buffer[strcspn(buffer, "\n")] = 0; 
             if(strcmp(buffer + 1, From_table)==0){
-                in_file_pos = ftell(fp) - strlen(buffer);
+                in_file_pos = ftell(fp);
+                printf("From_table found at position: %ld\n raw_bufer:%d\n", ftell(fp), raw_buffer_len);
+                printf("in_file_pos: %ld\n", in_file_pos);
             }
         }
         buffer[strcspn(buffer, "\n")] = 0;
-        if(buffer[0] == '-' && strcmp(buffer + 1,Field_name)==0){
+
+        char *start = buffer + 1; 
+        char *end = strchr(buffer, '{');
+        char length = end - start;
+        char column_name[256];
+
+        strncpy(column_name, start, length); 
+        column_name[length] = '\0';
+        printf("column_name: %s\n", column_name);
+        if(buffer[0] == '-' && strcmp(column_name,Field_name)==0){
             printf("column was found\n");
             char *data_start = strchr(buffer,':');
             if(data_start != NULL){
                 inline_pos = (data_start - buffer) + 1;
-                printf("iterating\n");
+                printf("inline_pos: %d\n", inline_pos);
                 int index = read_index_from_metadata(From_table, Field_name);
+                printf("index: %d\n", index);
                 if(capacity <= index){
                     int old_capacity = get_capacity();
                     update_capacity(old_capacity * 2);
                     // TODO: ADD EXPONENTIAL GROWTH
                     fprintf(stderr, "Capacity exceeded. Cannot insert more data.\n");
                 }
-                long targetted_offset = in_file_pos + inline_pos + (index * SLOT_SIZE);
+                long targetted_offset = in_file_pos + (long)inline_pos + (long)(index  * SLOT_SIZE);
+                printf("targetted offset: %ld\n", targetted_offset);
 
                 char slot_buffer[SLOT_SIZE];
-                memset(slot_buffer, '\0', sizeof(slot_buffer));
-                memcpy(slot_buffer, Insert_Data, SLOT_SIZE - 1);
+                memset(slot_buffer, '-', sizeof(slot_buffer));
+                memcpy(slot_buffer, Insert_Data,strlen(Insert_Data));
+                printf("%s\n", slot_buffer);
+               
                 fseek(fp, targetted_offset, SEEK_SET);
-                fwrite(slot_buffer, sizeof(char), SLOT_SIZE - 1, fp);
-                fputc(',', fp);
+                printf("writing to file at offset: %ld\n", ftell(fp));
+                fwrite(slot_buffer, sizeof(char), SLOT_SIZE-1, fp);
+                fputc(',',fp);
+                
                 update_metadatafile_inplace(From_table, Field_name, index + 1);
-                break;
+                return;
                 
             }
         }
