@@ -35,5 +35,6 @@ token_lib *parse_query(char *query_input);
 Database parse_file(FILE *fp);
 void print_tokens(QueryToken *tokens, int token_count);
 void print_database(Database db);
+char *trim(char *str);
 
 #endif

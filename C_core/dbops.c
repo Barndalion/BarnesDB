@@ -154,12 +154,10 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
 
     while(fgets(buffer,sizeof(buffer),fp)){
         if(buffer[0] == '#'){
-            printf("table was found\n");
-            long raw_buffer_len = strlen(buffer);
             buffer[strcspn(buffer, "\n")] = 0; 
             if(strcmp(buffer + 1, From_table)==0){
                 in_file_pos = ftell(fp);
-                printf("From_table found at position: %ld\n raw_bufer:%d\n", ftell(fp), raw_buffer_len);
+                printf("From_table found at position: %ld\n", ftell(fp));
                 printf("in_file_pos: %ld\n", in_file_pos);
             }
         }
@@ -179,7 +177,8 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
             if(data_start != NULL){
                 inline_pos = (data_start - buffer) + 1;
                 printf("inline_pos: %d\n", inline_pos);
-                int index = read_index_from_metadata(From_table, Field_name);
+                int index = read_index_from_metadata(From_table, Field_name) + 1;
+                update_metadatafile_inplace(From_table, Field_name, index);
                 printf("index: %d\n", index);
                 if(capacity <= index){
                     int old_capacity = get_capacity();
@@ -187,12 +186,14 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
                     // TODO: ADD EXPONENTIAL GROWTH
                     fprintf(stderr, "Capacity exceeded. Cannot insert more data.\n");
                 }
-                long targetted_offset = in_file_pos + (long)inline_pos + (long)(index  * SLOT_SIZE);
+                long targetted_offset = in_file_pos + (long)inline_pos + (long)(index * SLOT_SIZE);
                 printf("targetted offset: %ld\n", targetted_offset);
 
                 char slot_buffer[SLOT_SIZE];
                 memset(slot_buffer, '-', sizeof(slot_buffer));
-                memcpy(slot_buffer, Insert_Data,strlen(Insert_Data));
+                char *modified_data = indexify(Insert_Data, index);
+                printf("Insert_Data: %s\n", modified_data);
+                memcpy(slot_buffer, modified_data,strlen(modified_data));
                 printf("%s\n", slot_buffer);
                
                 fseek(fp, targetted_offset, SEEK_SET);
@@ -200,7 +201,7 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
                 fwrite(slot_buffer, sizeof(char), SLOT_SIZE-1, fp);
                 fputc(',',fp);
                 
-                update_metadatafile_inplace(From_table, Field_name, index + 1);
+                
                 return;
                 
             }
@@ -209,23 +210,47 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
     }
     fclose(fp);
 } 
+char *indexify(char *data, int index) {
+    char *indexified_data = malloc(strlen(data) + 10); // Allocate enough space for index
+    if (!indexified_data) {
+        perror("Failed to allocate memory");
+        return NULL; // Handle memory allocation failure
+    }
+    sprintf(indexified_data, "%s(%d)", data, index);
+    return indexified_data;
+}
 void update_metadatafile_inplace(const char *tablename, const char *fieldname, int new_index){
-    FILE *fp= fopen("metadata.txt", "r+");
+    FILE *fp = fopen("metadata.txt", "r+");
     if(!fp) return;
 
     char line[256];
-    long pos;
+    long line_start_pos = 0;
 
     while(fgets(line, sizeof(line), fp)) {
-        char *token_tablename = strtok(line, " ");
-        char *token_fieldname = strtok(NULL, " ");
+        // Save the start of this line
+        line_start_pos = ftell(fp) - strlen(line);
 
-        if(strcmp(token_fieldname, fieldname)==0 && strcmp(token_tablename, tablename)==0) {
-            pos = ftell(fp);
-            int index_pos = pos - 3;
-            char new_index_str[3];
-            sprintf(new_index_str, "%02d", new_index);
-            fwrite(new_index_str, 1, 2, fp);
+        // Make a copy for parsing
+        char line_copy[256];
+        strcpy(line_copy, line);
+
+        char *token_tablename = strtok(line_copy, " ");
+        char *token_fieldname = strtok(NULL, " ");
+        char *token_index = strtok(NULL, " ");
+
+        if(token_tablename && token_fieldname &&
+           strcmp(token_tablename, tablename) == 0 &&
+           strcmp(token_fieldname, fieldname) == 0) {
+
+            // Find the offset of the index in the original line
+            char *index_ptr = strstr(line, token_index);
+            if(index_ptr) {
+                long index_offset = line_start_pos + (index_ptr - line);
+                fseek(fp, index_offset, SEEK_SET);
+                char new_index_str[3];
+                sprintf(new_index_str, "%02d", new_index);
+                fwrite(new_index_str, 1, 3, fp);
+            }
             break;
         }
     }
@@ -280,4 +305,32 @@ void update_capacity(int new_capacity) {
         }
     }
     fclose(fp);
+}
+
+void write_metadata_bin(char* filename){
+    FILE *fp = fopen(filename, "r+");
+    if(!fp) {
+        fp = fopen(filename, "w+");
+    };
+
+    FILE *db_file = fopen("MyDB.txt", "r");
+    if(!db_file) return;
+
+    Database db = parse_file(db_file);
+
+    Metadata_records records;
+    for(int i = 0;i < db.table_count;i++){
+        Table *t = &db.tables[i];
+        strcpy(records.tablename, t->tablename);
+        for(int j = 0; j < t->column_count;j++){
+            Table *t = &db.tables[i];
+        strcpy(records.tablename, t->tablename);
+            Column *c = &t->columns[j];
+            strcpy(records.fieldname, c->columnname);
+            records.index_count = c->data_count; 
+            fwrite(&records, sizeof(Metadata_records), 1, fp);
+        }
+    }
+    fclose(fp); 
+    fclose(db_file); 
 }

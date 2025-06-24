@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "parser.h"
+#include "dbops.h"
 
 token_lib *parse_query(char *query){
 
@@ -111,8 +112,8 @@ Database parse_file(FILE *fp){
                     data_capacity *= 2;
                     data_array = realloc(data_array, sizeof(char*)*data_capacity);
                 }
-
-                data_array[data_count++] = strdup(token);
+                char* cleaned_token = trim(token);
+                data_array[data_count++] = strdup(cleaned_token);
                 token = strtok(NULL, ",");
             }
             Column col;
@@ -138,6 +139,30 @@ Database parse_file(FILE *fp){
     }
     return db;
 }
+//TO MUCH RELIANCE ON AI LOOK OVER
+char *trim(char *str){
+    char *buffer = malloc(SLOT_SIZE);
+    strncpy(buffer,str,SLOT_SIZE-1);
+    buffer[SLOT_SIZE-1] = '\0';
+
+    char* start = buffer;
+    while (*start == ' ' || *start == '\t' || *start == '\n' || *start == '-') {
+        start++;
+    }
+
+    // Shift trimmed string to the beginning of buffer
+    memmove(buffer, start, strlen(start) + 1);
+
+    for (int i = strlen(buffer) - 1; i >= 0; i--){
+        if(buffer[i] == '-' || buffer[i] == '\t' || buffer[i] == '\n' || buffer[i] == ' '){
+            buffer[i] = '\0';
+        }else{
+            break;
+        }
+    }
+
+    return buffer;
+}
 
 
 void print_database(Database db) {
@@ -148,7 +173,7 @@ void print_database(Database db) {
             Column c = t.columns[j];
             printf("  Column: %s | Datatype: %s => ", c.columnname, c.datatype);
             for (int k = 0; k < c.data_count; k++) {
-                printf("%s, ", c.data[k]);
+                printf("%s,",c.data[k]);
             }
             printf("\n");
         }

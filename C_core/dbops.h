@@ -18,6 +18,17 @@ typedef struct{
     }data;
 }retrieve_data;
 
+typedef struct{
+    char tablename[64];
+    char fieldname[64];
+    int index_count;
+}Metadata_records;
+
+typedef struct{
+    Metadata_records *records;
+    int record_count;
+}Metadata;
+
 int return_index(char *annotation);
 int get_index(char *data, Table *t, Column *c);
 char* remove_index_tag_copy(const char* data);
@@ -30,5 +41,7 @@ void update_metadatafile_inplace(const char *tablename, const char *fieldname, i
 int read_index_from_metadata(const char *tablename, const char *fieldname);
 int get_capacity();
 void update_capacity(int new_capacity);
+char *indexify(char *data, int index);
+void write_metadata_bin(char* filename);
 
 #endif
