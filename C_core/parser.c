@@ -60,7 +60,12 @@ token_lib *parse_query(char *query){
     return token_arr;
 }
 
-Database parse_file(FILE *fp){
+Database parse_file(char *filename){
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        perror("Failed to open file");
+        exit(EXIT_FAILURE);
+    }
     Database db = {NULL,0};
     Table current_table = {0};
     char line[1024];
@@ -113,6 +118,11 @@ Database parse_file(FILE *fp){
                     data_array = realloc(data_array, sizeof(char*)*data_capacity);
                 }
                 char* cleaned_token = trim(token);
+                if(!cleaned_token || strlen(cleaned_token) == 0){
+                    free(cleaned_token);
+                    token = strtok(NULL, ",");
+                    continue;
+                }
                 data_array[data_count++] = strdup(cleaned_token);
                 token = strtok(NULL, ",");
             }

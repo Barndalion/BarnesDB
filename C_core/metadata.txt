@@ -1,5 +1,0 @@
-Capacity 8
-tablename column1 -1
-tablename column2 -1
-tablename2 column1 -1
-tablename2 column2 -1

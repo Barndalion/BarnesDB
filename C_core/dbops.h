@@ -38,7 +38,7 @@ Column* get_column(Table *table, char *columnname);
 retrieve_data RETRIEVE(char *filename,char *select_data, char *From_table, char *Field_name);
 void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name);
 void update_metadatafile_inplace(const char *tablename, const char *fieldname, int new_index);
-int read_index_from_metadata(const char *tablename, const char *fieldname);
+int get_index_from_metadata(char *tablename, char* fieldname);
 int get_capacity();
 void update_capacity(int new_capacity);
 char *indexify(char *data, int index);

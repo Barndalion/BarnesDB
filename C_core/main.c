@@ -5,19 +5,9 @@
 #include "dbops.h"
 
 int main(){
-    // INSERT("INSERT_DATA", "MyDB.txt", "tablename", "column1");
-    FILE *fp = fopen("MyDB.txt", "r");
-    if (!fp) {
-        perror("Failed to open file");
-        return 1;
-    }
-
-    Database db = parse_file(fp);
-    print_database(db);
-    write_metadata_bin("metadata.bin");
     
-
-   fclose(fp);
+    INSERT("LIONEL", "MyDB.txt", "tablename2", "column1");
+    write_metadata_bin("MyDB.txt");
 
     return 0;
 }
