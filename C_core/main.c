@@ -6,8 +6,7 @@
 
 int main(){
     
-    INSERT("LIONEL", "MyDB.txt", "tablename2", "column1");
+    INSERT("LIONELll", "MyDB.txt", "tablename2", "column2");
     write_metadata_bin("MyDB.txt");
-
     return 0;
 }

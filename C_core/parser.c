@@ -3,6 +3,7 @@
 #include <string.h>
 #include "parser.h"
 #include "dbops.h"
+#include "utils.h"
 
 token_lib *parse_query(char *query){
 
@@ -148,57 +149,4 @@ Database parse_file(char *filename){
         db.tables[db.table_count++] = current_table;
     }
     return db;
-}
-//TO MUCH RELIANCE ON AI LOOK OVER
-char *trim(char *str){
-    char *buffer = malloc(SLOT_SIZE);
-    strncpy(buffer,str,SLOT_SIZE-1);
-    buffer[SLOT_SIZE-1] = '\0';
-
-    char* start = buffer;
-    while (*start == ' ' || *start == '\t' || *start == '\n' || *start == '-') {
-        start++;
-    }
-
-    // Shift trimmed string to the beginning of buffer
-    memmove(buffer, start, strlen(start) + 1);
-
-    for (int i = strlen(buffer) - 1; i >= 0; i--){
-        if(buffer[i] == '-' || buffer[i] == '\t' || buffer[i] == '\n' || buffer[i] == ' '){
-            buffer[i] = '\0';
-        }else{
-            break;
-        }
-    }
-
-    return buffer;
-}
-
-
-void print_database(Database db) {
-    for (int i = 0; i < db.table_count; i++) {
-        Table t = db.tables[i];
-        printf("Table: %s\n", t.tablename);
-        for (int j = 0; j < t.column_count; j++) {
-            Column c = t.columns[j];
-            printf("  Column: %s | Datatype: %s => ", c.columnname, c.datatype);
-            for (int k = 0; k < c.data_count; k++) {
-                printf("%s,",c.data[k]);
-            }
-            printf("\n");
-        }
-    }
-        printf("\n");
-}
-
-
-void print_tokens(QueryToken *tokens, int token_count) {
-    for (int i = 0; i < token_count; i++) {
-        printf("Keyword: %s\n", tokens[i].keyword);
-        printf("Data: ");
-        for (int j = 0; j < tokens[i].data_count; j++) {
-            printf("%s, ", tokens[i].data[j]);
-        }
-        printf("\n");
-    }
 }
