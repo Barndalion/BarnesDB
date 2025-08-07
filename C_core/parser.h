@@ -32,5 +32,5 @@ typedef struct{
 }token_lib;
 
 token_lib *parse_query(char *query_input);
-Database parse_file(char* filename);
+Database parse_file(FILE *fp);
 #endif

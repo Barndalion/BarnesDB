@@ -12,7 +12,7 @@ char *indexify(char *data, int index);
 int return_index(char *data);
 int get_index(char *data, Table *t, Column *c);
 char* remove_index_tag_copy(const char* data);
-char** get_index_data(int index, char *table_name);
+char** get_index_data(char* filename, int index, char *table_name);
 int get_capacity();
 void update_capacity(int new_capacity);
 void write_metadata_bin(char* filename);

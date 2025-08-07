@@ -61,12 +61,8 @@ token_lib *parse_query(char *query){
     return token_arr;
 }
 
-Database parse_file(char *filename){
-    FILE *fp = fopen(filename, "r");
-    if (!fp) {
-        perror("Failed to open file");
-        exit(EXIT_FAILURE);
-    }
+Database parse_file(FILE *fp){
+    
     Database db = {NULL,0};
     Table current_table = {0};
     char line[1024];

@@ -25,8 +25,12 @@ Column* get_column(Table *table, char *columnname){
 retrieve_data RETRIEVE(char *select_data, char *filename, char *From_table, char *Field_name){
     retrieve_data result;
 
+    FILE *fp = fopen(filename,"r");
+    if(!fp){
+        perror("FILE NOT FOUND");
+    }
    
-    Database db = parse_file(filename);
+    Database db = parse_file(fp);
     if(From_table == NULL && Field_name == NULL){
         Table *t = get_table(&db, select_data);
         result.type = RETURN_TYPE_TABLE;
@@ -44,7 +48,7 @@ retrieve_data RETRIEVE(char *select_data, char *filename, char *From_table, char
         Table *t = get_table(&db, From_table);
         Column *c = get_column(t, Field_name);
         int index = get_index(select_data, t, c);
-        char** temp_holder =  get_index_data(index, t->tablename);
+        char** temp_holder =  get_index_data(filename, index, t->tablename);
 
         
         result.type = RETURN_TYPE_ARRAY;
@@ -131,15 +135,72 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
 // Finish later
 
 void DELETE(char* filename, char* data, char* table, char *column){
-    FILE *fp = fopen(filename,"r");
+    
+    FILE *fp = fopen(filename,"r+");
     if(!fp){
         perror("File Not Found");
         return;
     }
-
     Database db = parse_file(fp);
+
     Table *t = get_table(&db,table);
     Column *c = get_column(t,column);
 
     int index = get_index(data,t,c);
+    if(index == -1){
+        fprintf(stderr, "NO ITEMS FOUND");
+        return;
+    }
+
+    char buffer[512];// holds 
+    int inline_pos; // Position of the inline data in the line
+    int in_table = 0; // Flag to check if we are in the correct table
+
+    long in_file_pos;
+    while(1){
+        printf("here nnnn \n");
+        in_file_pos = ftell(fp);
+        if(!fgets(buffer,sizeof(buffer),fp)){
+            break;
+        }
+        buffer[strcspn(buffer, "\n")] = 0;
+        if(buffer[0] == '#'){
+            if(strcmp(buffer + 1,table)==0){
+                in_table = 1;
+            }else{
+                in_table = 0;
+            }
+            continue;
+        }
+        printf("\n below tabletest \n");
+        if(in_table && buffer[0]=='-'){
+            char *start = buffer + 1; 
+            char *end = strchr(buffer, '{');
+            char length = end - start;
+            char column_name[65];
+            strncpy(column_name, start, length); 
+            column_name[length] = '\0';
+            printf("%s : %s", column_name,column);
+            if(strcmp(column_name,column)==0){
+                
+                char *data_start = strchr(buffer,':');
+                if(data_start != NULL){
+                    inline_pos = (data_start - buffer) + 1;
+                
+                    long targetted_offset = in_file_pos + (long)inline_pos + (long)(index * (SLOT_SIZE));
+
+                    char slot_buffer[SLOT_SIZE];
+                    memset(slot_buffer, '-', sizeof(slot_buffer));
+                    printf("%d    %d    %d", in_file_pos,inline_pos,targetted_offset);
+                    printf("Deleted entry at index %d\n", index); 
+                
+                    fseek(fp, targetted_offset, SEEK_SET);
+                    fwrite(slot_buffer, sizeof(char), SLOT_SIZE-1, fp);
+                    fputc(',',fp);
+                    fclose(fp);
+
+                }
+            }
+        }
+    }
 }

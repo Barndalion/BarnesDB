@@ -123,9 +123,12 @@ char* remove_index_tag_copy(const char* data) {
     return result;
 }
 
-char** get_index_data(int index, char *table_name){
-    
-    Database db = parse_file("MyDB.txt");
+char** get_index_data(char* filename, int index, char *table_name){
+    FILE *fp = fopen(filename,"r");
+    if(!fp){
+        perror("FILE NOT FOUND");
+    }
+    Database db = parse_file(fp);
     Table *t = get_table(&db, table_name);
     char **data = malloc((t->column_count +1) * sizeof(char*));
     for(int i = 0;i < t->column_count;i++){
@@ -170,11 +173,15 @@ void write_metadata_bin(char* filename){
     if(!fp) return;
 
     int size = 8;
+    FILE *fr = fopen(filename,"r");
+    if(!fp){
+        perror("FILE NOT FOUND");
+    }
     // Write capacity at the start
     fseek(fp, 0, SEEK_SET);
     fwrite(&size, sizeof(int), 1, fp);
 
-    Database db = parse_file(filename);
+    Database db = parse_file(fr);
 
     Metadata_records records;
     // Start writing records after the header
