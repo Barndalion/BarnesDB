@@ -104,14 +104,17 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
                     inline_pos = (data_start - buffer) + 1;
                     int index = get_index_from_metadata(From_table, Field_name);
                     int old_capacity = get_capacity();
+                    update_metadatafile_inplace(From_table,Field_name,(index + 1));
                     if(old_capacity <= index){
                         update_capacity(old_capacity * 2);
                         // TODO: ADD EXPONENTIAL GROWTH
                         fprintf(stderr, "Capacity exceeded. Cannot insert more data.\n");
                         break;
                     }
-                    update_metadatafile_inplace(From_table, Field_name, index + 1);
-                    long targetted_offset = in_file_pos + (long)inline_pos + (long)(index * (SLOT_SIZE));
+                    
+                    // write_metadata_bin(filename);
+                    long targetted_offset = in_file_pos + (long)inline_pos + (long)((index) * (SLOT_SIZE));
+                    printf("%d\n", targetted_offset);
 
                     char slot_buffer[SLOT_SIZE];
                     memset(slot_buffer, '-', sizeof(slot_buffer));
@@ -121,10 +124,7 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
                     fseek(fp, targetted_offset, SEEK_SET);
                     fwrite(slot_buffer, sizeof(char), SLOT_SIZE-1, fp);
                     fputc(',',fp);
-                    
-                    
-                    return;
-                    
+                    break;
                 }
             }
         }
@@ -135,13 +135,10 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
 // Finish later
 
 void DELETE(char* filename, char* data, char* table, char *column){
-    
+    // open and close for db
     FILE *fp = fopen(filename,"r+");
-    if(!fp){
-        perror("File Not Found");
-        return;
-    }
     Database db = parse_file(fp);
+    fclose(fp);
 
     Table *t = get_table(&db,table);
     Column *c = get_column(t,column);
@@ -155,12 +152,18 @@ void DELETE(char* filename, char* data, char* table, char *column){
     char buffer[512];// holds 
     int inline_pos; // Position of the inline data in the line
     int in_table = 0; // Flag to check if we are in the correct table
-
+    FILE *fa = fopen(filename,"r+");
+    if(!fa){
+        perror("file not found");
+        return;
+    }
     long in_file_pos;
+    printf("%d", index);
     while(1){
-        printf("here nnnn \n");
-        in_file_pos = ftell(fp);
-        if(!fgets(buffer,sizeof(buffer),fp)){
+        printf("start of while loop \n");
+        in_file_pos = ftell(fa);
+        if(!fgets(buffer,sizeof(buffer),fa)){
+            printf("ends here \n");
             break;
         }
         buffer[strcspn(buffer, "\n")] = 0;
@@ -174,33 +177,39 @@ void DELETE(char* filename, char* data, char* table, char *column){
         }
         printf("\n below tabletest \n");
         if(in_table && buffer[0]=='-'){
+            printf("entered in table block test \n");
             char *start = buffer + 1; 
             char *end = strchr(buffer, '{');
             char length = end - start;
             char column_name[65];
             strncpy(column_name, start, length); 
             column_name[length] = '\0';
-            printf("%s : %s", column_name,column);
+            printf("comparing current column(%s) to %s", column_name,column);
             if(strcmp(column_name,column)==0){
-                
                 char *data_start = strchr(buffer,':');
                 if(data_start != NULL){
+                    if(index == get_index_from_metadata(table,column) ){
+                        update_metadatafile_inplace(table,column,(index - 1));
+                    }
                     inline_pos = (data_start - buffer) + 1;
                 
                     long targetted_offset = in_file_pos + (long)inline_pos + (long)(index * (SLOT_SIZE));
 
                     char slot_buffer[SLOT_SIZE];
                     memset(slot_buffer, '-', sizeof(slot_buffer));
-                    printf("%d    %d    %d", in_file_pos,inline_pos,targetted_offset);
-                    printf("Deleted entry at index %d\n", index); 
                 
-                    fseek(fp, targetted_offset, SEEK_SET);
-                    fwrite(slot_buffer, sizeof(char), SLOT_SIZE-1, fp);
-                    fputc(',',fp);
-                    fclose(fp);
+                    fseek(fa, targetted_offset, SEEK_SET);
+                    fwrite(slot_buffer, sizeof(char), SLOT_SIZE-1, fa);
+                    fputc(',',fa);
 
+                    
+                    break;
                 }
+            }
+            else{
+                continue;
             }
         }
     }
+    fclose(fa);
 }

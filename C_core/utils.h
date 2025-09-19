@@ -19,5 +19,6 @@ void write_metadata_bin(char* filename);
 void insert_metadata_record(char *tablename, char *fieldname, int index_count);
 int get_index_from_metadata(char *tablename, char* fieldname);
 void update_metadatafile_inplace(const char *tablename, const char *fieldname, int new_index);
+void print_metadata_bin();
 
 #endif

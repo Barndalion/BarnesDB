@@ -167,36 +167,48 @@ void update_capacity(int new_capacity) {
     fwrite(&new_capacity, sizeof(int), 1, fp); // Write the new capacity
     fclose(fp);
 }
-
+// ISSUE: THere is a index issue when writing because when a data is deleted at a random spot it wont align with how the index is added to the metaata bin. modify this function to write the index of the last piece of data + 1
 void write_metadata_bin(char* filename){
-    FILE *fp = fopen("metadata.bin", "w+b");
-    if(!fp) return;
-
-    int size = 8;
-    FILE *fr = fopen(filename,"r");
+    FILE *fp = fopen("metadata.bin", "r+");
     if(!fp){
+        fp = fopen("metadata.bin", "w");
+    };
+
+    int buffer;
+    fread(&buffer,sizeof(int),1,fp);
+    if(!buffer){
+            buffer = 8;
+            fseek(fp,0,SEEK_SET);
+            fwrite(&buffer,sizeof(int),1,fp);
+    }else{
+            fseek(fp,sizeof(int),SEEK_SET);
+        }
+
+    FILE *fr = fopen(filename,"r");
+    if(!fr){
         perror("FILE NOT FOUND");
+        return;
     }
-    // Write capacity at the start
-    fseek(fp, 0, SEEK_SET);
-    fwrite(&size, sizeof(int), 1, fp);
-
+    Metadata_records metadata;
+    char* tablename;
     Database db = parse_file(fr);
+    for(int i = 0;i<db.table_count;i++){
+        Table t = db.tables[i];
+        for(int j = 0;j<t.column_count;j++){
+            strncpy(tablename,t.tablename,sizeof(t.tablename));
+            Column c = t.columns[j];
 
-    Metadata_records records;
-    // Start writing records after the header
-    fseek(fp, sizeof(int), SEEK_SET);
-    for(int i = 0; i < db.table_count; i++){
-        Table *t = &db.tables[i];
-        strcpy(records.tablename, t->tablename);
-        for(int j = 0; j < t->column_count; j++){
-            Column *c = &t->columns[j];
-            strcpy(records.fieldname, c->columnname);
-            records.index_count = c->data_count;
-            fwrite(&records, sizeof(Metadata_records), 1, fp);
+            int index = return_index(c.data[c.data_count - 1]);
+            
+            strncpy(metadata.tablename,t.tablename,64);
+            strncpy(metadata.fieldname,c.columnname,64);
+            metadata.index_count = index + 1;
+
+            fseek(fp,0,SEEK_CUR);
+            fwrite(&metadata,sizeof(Metadata_records),1,fp);
         }
     }
-    fclose(fp); 
+    fcloseall();
 }
 
 //currently useless will be useful in the future when we add a insert column or so feature otherwise write_metadata_bin will be used  to update metadata
@@ -233,7 +245,8 @@ int get_index_from_metadata(char *tablename, char* fieldname){
             return index_count;
         }
     }
-    
+    fclose(fp);
+    return -1; // not found
 }
 void update_metadatafile_inplace(const char *tablename, const char *fieldname, int new_index){
     FILE *fp = fopen("metadata.bin", "r+");
@@ -247,10 +260,30 @@ void update_metadatafile_inplace(const char *tablename, const char *fieldname, i
     while (fread(&record, sizeof(Metadata_records), 1, fp)) {
         if (strcmp(record.tablename, tablename) == 0 && strcmp(record.fieldname, fieldname) == 0) {
             record.index_count = new_index; 
-            fseek(fp, sizeof(Metadata_records), SEEK_CUR); 
+            // move file position back to the start of this record so we overwrite it
+            if (fseek(fp, -((long)sizeof(Metadata_records)), SEEK_CUR) != 0) {
+                perror("fseek failed");
+                break;
+            }
             fwrite(&record, sizeof(Metadata_records), 1, fp); 
+            fflush(fp);
             break;
         }
     }
     fclose(fp);
+}
+void print_metadata_bin(){
+    FILE* fp = fopen("metadata.bin","r");
+    if(!fp){
+        perror("NO FILE FOUND");
+        return;
+    }
+    
+    Metadata_records buffer;
+    fseek(fp,sizeof(int),SEEK_SET);
+    while(fread(&buffer,sizeof(Metadata_records),1,fp)){
+        printf("Table Name: %s\nField Name: %s\nIndex Count: %d\n",buffer.tablename,buffer.fieldname,buffer.index_count);
+        
+    }
+    fcloseall();
 }

@@ -3,12 +3,13 @@
 #define SLOT_SIZE 65
 
 #include "parser.h"
+// dynamic typing system
 typedef enum{
     RETURN_TYPE_TABLE,
     RETURN_TYPE_COLUMN,
     RETURN_TYPE_ARRAY,
 }return_type;
-
+// helper dynamic typing
 typedef struct{
     return_type type;
     union {
@@ -24,10 +25,6 @@ typedef struct{
     int index_count;
 }Metadata_records;
 
-typedef struct{
-    Metadata_records *records;
-    int record_count;
-}Metadata;
 
 Table* get_table(Database *db, char *tablename);
 Column* get_column(Table *table, char *columnname);
