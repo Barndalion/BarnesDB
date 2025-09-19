@@ -70,6 +70,7 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
         perror("Failed to open file");
         return; 
     } // standard file safety
+    printf("hi");
 
     char buffer[512];// holds 
     int inline_pos; // Position of the inline data in the line
@@ -77,6 +78,7 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
 
     long in_file_pos;
     while(1){
+        printf("hi while loop");
         in_file_pos = ftell(fp);
         if(!fgets(buffer,sizeof(buffer),fp)){
             break;
@@ -91,14 +93,17 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
             continue;
         }
         if(in_table && buffer[0]=='-'){
+            printf("in first check");
             char *start = buffer + 1; 
             char *end = strchr(buffer, '{');
             char length = end - start;
             char column_name[65];
             strncpy(column_name, start, length); 
             column_name[length] = '\0';
+            printf("\n%s, %s\n", column_name, Field_name);
             
             if(strcmp(column_name,Field_name)==0){
+                printf("in second check");
                 char *data_start = strchr(buffer,':');
                 if(data_start != NULL){
                     inline_pos = (data_start - buffer) + 1;
@@ -111,7 +116,7 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
                         fprintf(stderr, "Capacity exceeded. Cannot insert more data.\n");
                         break;
                     }
-                    
+                    printf("in final if check");
                     // write_metadata_bin(filename);
                     long targetted_offset = in_file_pos + (long)inline_pos + (long)((index) * (SLOT_SIZE));
                     printf("%d\n", targetted_offset);
