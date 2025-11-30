@@ -6,9 +6,7 @@
 #include "utils.h"
 
 token_lib *parse_query(char *query){
-
     token_lib *token_arr = malloc(sizeof(token_lib));
-
     token_arr->tokens = malloc(sizeof(QueryToken));
     token_arr->token_count = 0;
 
@@ -39,6 +37,7 @@ token_lib *parse_query(char *query){
         QueryToken qt;
         int capacity = 2;
         qt.keyword = keyword;
+         
         qt.data = malloc(sizeof(char*));
         char *saveptr;
         char *data_token = strtok_r(data, " ", &saveptr);
@@ -47,7 +46,8 @@ token_lib *parse_query(char *query){
                     qt.data = realloc(qt.data, sizeof(char*) * capacity);
                     capacity *= 2;
                 }
-            qt.data[data_count++] = strdup(data_token);
+               
+                qt.data[data_count++] = strdup(data_token);
             data_token = strtok_r(NULL, ",", &saveptr);
         }
         qt.data_count = data_count;
@@ -57,12 +57,30 @@ token_lib *parse_query(char *query){
 
         token = strtok_r(NULL, " ", &saveptr2);
     }
-    
     return token_arr;
 }
 
+void free_token_lib(token_lib *lib) {
+    if (!lib) return;
+
+    for (int i = 0; i < lib->token_count; i++) {
+        QueryToken *t = &lib->tokens[i];
+
+        free(t->keyword);
+
+        for (int j = 0; j < t->data_count; j++) {
+            free(t->data[j]);
+        }
+        free(t->data);
+    }
+
+    free(lib->tokens);
+    free(lib);
+}
+
+
 Database parse_file(FILE *fp){
-    
+
     Database db = {NULL,0};
     Table current_table = {0};
     char line[1024];
@@ -74,12 +92,11 @@ Database parse_file(FILE *fp){
                         db.tables = realloc(db.tables, sizeof(Table) * (db.table_count + 1));
                         db.tables[db.table_count++] = current_table;
                         current_table = (Table){0};  
-                    }
-            current_table.tablename = strdup(line + 1);
                 }
+                current_table.tablename = strdup(line + 1);
+        }
 
         else if(line[0]=='-'){
-
             char *colon = strchr(line, ':');
             if(!colon){
                 continue;
@@ -93,17 +110,20 @@ Database parse_file(FILE *fp){
             }
 
             int datatype_len = datatypeend - datatypestart;
+
             char *datatype = malloc(datatype_len + 1);
             strncpy(datatype,datatypestart+1, datatype_len-1);
             datatype[datatype_len-1] = '\0';
 
             int name_len = datatypestart - (line+1);
+
             char *column_name = malloc(name_len + 1);
             strncpy(column_name,line + 1, name_len);
             column_name[name_len] = '\0';
 
             char *data = colon +1;
             int data_capacity = 4;
+        
             char **data_array = malloc(data_capacity * sizeof(char*));
             int data_count = 0;
 
@@ -145,4 +165,26 @@ Database parse_file(FILE *fp){
         db.tables[db.table_count++] = current_table;
     }
     return db;
+}
+void free_database(Database db) {
+    for (int i = 0; i < db.table_count; i++) {
+        Table *table = &db.tables[i];
+        free(table->tablename);
+
+        for (int j = 0; j < table->column_count; j++) {
+            Column *col = &table->columns[j];
+            free(col->columnname);
+            free(col->datatype);
+
+            for (int k = 0; k < col->data_count; k++) {
+                free(col->data[k]); // free each string
+            }
+
+            free(col->data); // free array of strings
+        }
+
+        free(table->columns); // free array of columns
+    }
+
+    free(db.tables); // free array of tables
 }

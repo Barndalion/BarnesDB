@@ -5,6 +5,7 @@
 #include "parser.h"
 
 
+
 void print_tokens(QueryToken *tokens, int token_count);
 void print_database(Database db);
 char *trim(char *str);
@@ -20,5 +21,9 @@ void insert_metadata_record(char *tablename, char *fieldname, int index_count);
 int get_index_from_metadata(char *tablename, char* fieldname);
 void update_metadatafile_inplace(const char *tablename, const char *fieldname, int new_index);
 void print_metadata_bin();
+void initialize_runtime_database(const char* database_name);
+const char* active_database(void);
+const char* metadata_file(void);
+int file_exists_fopen(const char *filename);
 
 #endif

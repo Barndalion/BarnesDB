@@ -28,8 +28,12 @@ typedef struct{
 
 Table* get_table(Database *db, char *tablename);
 Column* get_column(Table *table, char *columnname);
+/* NOTE: RETRIEVE may return pointers into dynamically-allocated data (e.g.
+    Table*, Column* or char**). Depending on how parse_file and get_index_data
+    allocate memory, the caller may be responsible for freeing those objects.
+    Make sure to use a deallocation helper for any returned heap memory. */
 retrieve_data RETRIEVE(char *filename,char *select_data, char *From_table, char *Field_name);
-void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name);
-void DELETE(char* filename, char* data, char* table, char *column);
+void INSERT(char *Insert_Data,const char *filename,char *From_table, char *Field_name);
+void DELETE(const char* filename, char* data, char* table, char *column);
 
 #endif

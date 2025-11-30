@@ -4,9 +4,12 @@
 #include "dbops.h"
 #include "parser.h"
 #include "utils.h"
-
+static char active_metadata_file[512] = "MyDB.bin";
 //TO MUCH RELIANCE ON AI LOOK OVER
 char *trim(char *str){
+    /* POTENTIAL MEMORY LEAK: this function allocates and returns a new buffer
+       using malloc(). Callers must free() the returned pointer to avoid
+       leaking memory. */
     char *buffer = malloc(SLOT_SIZE);
     strncpy(buffer,str,SLOT_SIZE-1);
     buffer[SLOT_SIZE-1] = '\0';
@@ -58,6 +61,8 @@ void print_tokens(QueryToken *tokens, int token_count) {
     }
 }
 
+/* POTENTIAL MEMORY LEAK: indexify allocates and returns a new string via
+    malloc(); callers must free() this buffer when no longer needed. */
 char *indexify(char *data, int index) {
     char *indexified_data = malloc(strlen(data) + 10); // Allocate enough space for index
     if (!indexified_data) {
@@ -69,6 +74,11 @@ char *indexify(char *data, int index) {
 }
 
 int return_index(char *data){
+    /* POTENTIAL MEMORY LEAK: this function allocates a temporary string
+       `index` using malloc() and returns an int converted by atoi(). The
+       allocated `index` is not freed before the function returns, causing a
+       memory leak. Consider using a stack buffer or free(index) before
+       returning. */
     char* index_start = strchr(data, '(');
     char* index_end = strchr(data, ')');
 
@@ -78,6 +88,11 @@ int return_index(char *data){
         strncpy(index, index_start + 1, index_len);
         index[index_len] = '\0';
 
+        /* NOTE: index is not freed; this leaks memory. Add free(index) before
+           returning to avoid the leak, e.g.:
+               int val = atoi(index);
+               free(index);
+               return val; */
     return atoi(index);
     } else {
         fprintf(stderr, "Invalid index format in data: %s\n", data);
@@ -92,8 +107,12 @@ int get_index(char *data, Table *t, Column *c){
     }
 
     for(int i = 0; i < c->data_count; i++){
+        /* POTENTIAL MEMORY LEAK: remove_index_tag_copy returns allocated
+           memory which must be freed. `comp_data` should be freed after use,
+           otherwise this loop will leak for every iteration. */
         char* comp_data = remove_index_tag_copy(c->data[i]);
         if (strcmp(comp_data, data) == 0) {
+            /* NOTE: comp_data must be freed before returning */
             return return_index(c->data[i]);
         }
     }
@@ -102,6 +121,8 @@ int get_index(char *data, Table *t, Column *c){
     return -1;   
 }
 
+/* NOTE: remove_index_tag_copy returns a malloc'd/strdup'd buffer. Callers
+    must free() the returned string after use. */
 char* remove_index_tag_copy(const char* data) {
     char* index_start = strchr(data, '(');
     if (!index_start) return strdup(data); // no tag found
@@ -124,6 +145,11 @@ char* remove_index_tag_copy(const char* data) {
 }
 
 char** get_index_data(char* filename, int index, char *table_name){
+    /* WARNING: this function opens a FILE* (fp) but does not fclose(fp).
+       This can leak file descriptors. Also parse_file(fp) allocates heap
+       memory for the returned Database; this memory is never freed here.
+       The returned `char**` contains malloc()/strdup()'d strings; the
+       caller must free the char* items and the array itself. */
     FILE *fp = fopen(filename,"r");
     if(!fp){
         perror("FILE NOT FOUND");
@@ -145,7 +171,7 @@ char** get_index_data(char* filename, int index, char *table_name){
 }
 
 int get_capacity(){
-    FILE *fp = fopen("metadata.bin", "r+");
+    FILE *fp = fopen(metadata_file(), "r+"); /* NOTE: hardcoded metadata filename - consider deriving from DB filename */
     if (!fp) return 0;
 
     int capacity;
@@ -160,7 +186,7 @@ int get_capacity(){
 }
 
 void update_capacity(int new_capacity) {
-    FILE *fp = fopen("metadata.bin", "r+");
+    FILE *fp = fopen(metadata_file(), "r+"); /* NOTE: hardcoded metadata filename - consider deriving from DB filename */
     if (!fp) return;
 
     fseek(fp, 0, SEEK_SET); // Move to the beginning of the file
@@ -169,10 +195,7 @@ void update_capacity(int new_capacity) {
 }
 // ISSUE: THere is a index issue when writing because when a data is deleted at a random spot it wont align with how the index is added to the metaata bin. modify this function to write the index of the last piece of data + 1
 void write_metadata_bin(char* filename){
-    FILE *fp = fopen("metadata.bin", "r+");
-    if(!fp){
-        fp = fopen("metadata.bin", "w");
-    };
+    FILE *fp = fopen(active_metadata_file, "r+"); 
 
     int buffer;
     fread(&buffer,sizeof(int),1,fp);
@@ -208,12 +231,18 @@ void write_metadata_bin(char* filename){
             fwrite(&metadata,sizeof(Metadata_records),1,fp);
         }
     }
-    fcloseall();
+     /* WARNING: this code calls fcloseall() which may not be portable. The
+         file pointers `fr` and `fp` opened earlier are not explicitly
+         closed via fclose() here. Prefer calling fclose(fr); fclose(fp); to
+         close resources. Otherwise file descriptors can leak. */
+     fcloseall();
 }
 
 //currently useless will be useful in the future when we add a insert column or so feature otherwise write_metadata_bin will be used  to update metadata
 void insert_metadata_record(char *tablename, char *fieldname, int index_count){
-    FILE *fp = fopen("metadata.bin","a+");
+    /* WARNING: The FILE* `fp` is not closed in this function; add fclose(fp)
+       to avoid leaking file descriptors. */
+    FILE *fp = fopen(metadata_file(),"a+"); /* NOTE: hardcoded metadata filename - consider deriving from DB filename */
     if (!fp){
         perror("Failed to open metadata file");
         return;
@@ -229,7 +258,7 @@ void insert_metadata_record(char *tablename, char *fieldname, int index_count){
 }
 
 int get_index_from_metadata(char *tablename, char* fieldname){
-    FILE *fp = fopen("metadata.bin","r");
+    FILE *fp = fopen(metadata_file(),"r"); /* NOTE: hardcoded metadata filename - consider deriving from DB filename */
     if(!fp) {
         perror("Failed to open metadata file");
         return -1; // Error opening file
@@ -249,7 +278,7 @@ int get_index_from_metadata(char *tablename, char* fieldname){
     return -1; // not found
 }
 void update_metadatafile_inplace(const char *tablename, const char *fieldname, int new_index){
-    FILE *fp = fopen("metadata.bin", "r+");
+    FILE *fp = fopen(metadata_file(), "r+"); /* NOTE: hardcoded metadata filename - consider deriving from DB filename */
     if (!fp) {
         perror("Failed to open metadata file");
         return;
@@ -273,7 +302,7 @@ void update_metadatafile_inplace(const char *tablename, const char *fieldname, i
     fclose(fp);
 }
 void print_metadata_bin(){
-    FILE* fp = fopen("metadata.bin","r");
+    FILE* fp = fopen(metadata_file(),"r"); /* NOTE: hardcoded metadata filename - consider deriving from DB filename */
     if(!fp){
         perror("NO FILE FOUND");
         return;
@@ -285,5 +314,64 @@ void print_metadata_bin(){
         printf("Table Name: %s\nField Name: %s\nIndex Count: %d\n",buffer.tablename,buffer.fieldname,buffer.index_count);
         
     }
-    fcloseall();
+    fclose(fp);
+}
+
+/* Active metadata filename (writable buffer). Defaults to "metadata.bin".
+   Call initialize_runtime_database("MyDB.txt") to derive a per-DB metadata file
+   (e.g. MyDB.bin). */
+
+
+void initialize_runtime_database(const char* database_name){
+    if(!database_name) return;
+    size_t len =  strlen(database_name);
+     /* POTENTIAL MEMORY LEAK: `name` is allocated with malloc() and only freed
+         in a branch where the file didn't exist. If the file exists or the
+         code takes other branches, `name` is not freed. Either free `name`
+         in all paths or avoid heap allocation here (use a stack buffer). */
+     char* name = malloc(sizeof(len) + 5);
+    const char* dot = strrchr(database_name,'.');
+    if(!dot){
+        snprintf(active_metadata_file, sizeof(active_metadata_file), "%s.bin", database_name);
+        snprintf(name,len + 5,"%s.txt",database_name);
+        if(!file_exists_fopen(name)){
+            FILE* fp = fopen(name, "w");
+            free(name);
+            if(!fp){
+                perror("ERROR OCCURED!");
+                return;
+            }
+        }
+        if(!file_exists_fopen(active_metadata_file)){
+            FILE* fp = fopen(active_metadata_file, "w");
+            if(!fp){
+                perror("ERROR OCCURED!");
+                return;
+            }
+        }
+    }
+}
+
+int file_exists_fopen(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file) {
+        fclose(file);
+        return 1; // File exists
+    }
+    return 0; // File does not exist
+}
+
+const char* active_database(void){
+    static char db_name[512];
+    // Copy the active metadata filename and replace the extension with .txt
+    strncpy(db_name, active_metadata_file, sizeof(db_name)-1);
+    db_name[sizeof(db_name)-1] = '\0';
+    char *dot = strrchr(db_name, '.');
+    if (dot) *dot = '\0';
+    strncat(db_name, ".txt", sizeof(db_name) - strlen(db_name) - 1);
+    return db_name;
+}
+
+const char* metadata_file(void){
+    return active_metadata_file;
 }

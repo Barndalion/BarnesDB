@@ -25,34 +25,55 @@ Column* get_column(Table *table, char *columnname){
 retrieve_data RETRIEVE(char *select_data, char *filename, char *From_table, char *Field_name){
     retrieve_data result;
 
-    FILE *fp = fopen(filename,"r");
+     /* WARNING: fp is opened but if this function returns early in any branch
+         fp is not closed; add fclose(fp) with all return paths to avoid leaking
+         file descriptors. Also parse_file(fp) allocates a Database structure
+         that must be freed by the caller; parse_file allocations are not freed
+         inside this function, which will leak memory. */
+     FILE *fp = fopen(filename,"r");
     if(!fp){
         perror("FILE NOT FOUND");
     }
    
-    Database db = parse_file(fp);
+     Database db = parse_file(fp);
+     /* POTENTIAL MEMORY LEAK: db and its inner allocations are heap allocated
+         by parse_file and are not freed in this function. Callers should have
+         a function to free Database to avoid leaks. */
     if(From_table == NULL && Field_name == NULL){
         Table *t = get_table(&db, select_data);
         result.type = RETURN_TYPE_TABLE;
         result.data.table = t;
-        return result;
+          /* NOTE: returning early here leaves `fp` open and `db` heap memory
+              allocated. Consider freeing db and closing fp before returning. */
+          return result;
     }
     if(From_table != NULL && Field_name == NULL){
         Table *t = get_table(&db, From_table);
         Column *c = get_column(t,select_data);
         result.type = RETURN_TYPE_COLUMN;
         result.data.column = c;
-        return result;
+          /* NOTE: returning early here leaves `fp` open and `db` heap memory
+              allocated. Consider freeing db and closing fp before returning. */
+          return result;
     }
     if(From_table != NULL && Field_name != NULL){
         Table *t = get_table(&db, From_table);
         Column *c = get_column(t, Field_name);
         int index = get_index(select_data, t, c);
-        char** temp_holder =  get_index_data(filename, index, t->tablename);
+          char** temp_holder =  get_index_data(filename, index, t->tablename);
+          /* POTENTIAL MEMORY LEAK: temp_holder and the strings it points to are
+              heap allocated by get_index_data. This function copies pointers
+              into result.data.array but does not free temp_holder or the
+              parse_file allocations (in `db`), causing leaks. */
 
         
-        result.type = RETURN_TYPE_ARRAY;
-        result.data.array = malloc(t->column_count * sizeof(char*));
+          result.type = RETURN_TYPE_ARRAY;
+          /* POTENTIAL MEMORY LEAK: result.data.array is heap-allocated here and
+              must be freed by the caller; the function also copies pointers
+              from temp_holder and does not free temp_holder or db objects.
+              Overall, ensure a clear ownership and a free()/destroy helper
+              to prevent memory leaks. */
+          result.data.array = malloc(t->column_count * sizeof(char*));
         for(int i = 0; i < t->column_count; i++){
             result.data.array[i] = temp_holder[i];
         }
@@ -64,13 +85,12 @@ retrieve_data RETRIEVE(char *select_data, char *filename, char *From_table, char
 /* insert function: it calculates the precise offset in the file using the index which is stored in
 metadata file. it also updates the index and dynamically grows the textfile if space runs out */
 
-void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name){
+void INSERT(char *Insert_Data,const char *filename,char *From_table, char *Field_name){
     FILE *fp = fopen(filename, "r+");
     if(!fp) {
         perror("Failed to open file");
         return; 
     } // standard file safety
-    printf("hi");
 
     char buffer[512];// holds 
     int inline_pos; // Position of the inline data in the line
@@ -94,11 +114,16 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
         }
         if(in_table && buffer[0]=='-'){
             printf("in first check");
-            char *start = buffer + 1; 
+            char *start = buffer + 1;
             char *end = strchr(buffer, '{');
-            char length = end - start;
+            if (!end) {
+                fprintf(stderr, "Malformed column line\n");
+                continue;
+            }
             char column_name[65];
-            strncpy(column_name, start, length); 
+            int length = end - start;  // use int, not char
+            if(length >= sizeof(column_name)) length = sizeof(column_name) - 1;
+            strncpy(column_name, start, length);
             column_name[length] = '\0';
             printf("\n%s, %s\n", column_name, Field_name);
             
@@ -123,7 +148,9 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
 
                     char slot_buffer[SLOT_SIZE];
                     memset(slot_buffer, '-', sizeof(slot_buffer));
-                    char *modified_data = indexify(Insert_Data, index);
+                          /* POTENTIAL MEMORY LEAK: indexify() returns a malloc'd
+                              string; modified_data should be freed after use. */
+                          char *modified_data = indexify(Insert_Data, index);
                     memcpy(slot_buffer, modified_data,strlen(modified_data));
                 
                     fseek(fp, targetted_offset, SEEK_SET);
@@ -139,10 +166,16 @@ void INSERT(char *Insert_Data, char *filename,char *From_table, char *Field_name
 
 // Finish later
 
-void DELETE(char* filename, char* data, char* table, char *column){
+void DELETE(const char* filename, char* data, char* table, char *column){
     // open and close for db
     FILE *fp = fopen(filename,"r+");
-    Database db = parse_file(fp);
+    if(!fp){
+        perror("FILE NOT FOUND");
+    }
+     Database db = parse_file(fp);
+     /* POTENTIAL MEMORY LEAK: parse_file allocates heap memory for Database
+         and nested structures which is never freed in this function. Add a
+         free_database() or similar helper to release the memory when done. */
     fclose(fp);
 
     Table *t = get_table(&db,table);
@@ -168,7 +201,7 @@ void DELETE(char* filename, char* data, char* table, char *column){
         printf("start of while loop \n");
         in_file_pos = ftell(fa);
         if(!fgets(buffer,sizeof(buffer),fa)){
-            printf("ends here \n");
+            printf("NOT FOUND \n");
             break;
         }
         buffer[strcspn(buffer, "\n")] = 0;
@@ -183,19 +216,26 @@ void DELETE(char* filename, char* data, char* table, char *column){
         printf("\n below tabletest \n");
         if(in_table && buffer[0]=='-'){
             printf("entered in table block test \n");
-            char *start = buffer + 1; 
+            char *start = buffer + 1;
             char *end = strchr(buffer, '{');
-            char length = end - start;
+            if (!end) {
+                fprintf(stderr, "Malformed column line\n");
+                continue;
+            }
             char column_name[65];
-            strncpy(column_name, start, length); 
+            int length = end - start;  // use int, not char
+            if(length >= sizeof(column_name)) length = sizeof(column_name) - 1;
+            strncpy(column_name, start, length);
             column_name[length] = '\0';
-            printf("comparing current column(%s) to %s", column_name,column);
+
+            printf("parsed column_name: '%s'\n", column_name);
             if(strcmp(column_name,column)==0){
                 char *data_start = strchr(buffer,':');
                 if(data_start != NULL){
                     if(index == get_index_from_metadata(table,column) ){
                         update_metadatafile_inplace(table,column,(index - 1));
                     }
+                    printf("Index: %d\nget_index_from_metadatat: %d",index,get_index_from_metadata(table,column));
                     inline_pos = (data_start - buffer) + 1;
                 
                     long targetted_offset = in_file_pos + (long)inline_pos + (long)(index * (SLOT_SIZE));
@@ -217,4 +257,11 @@ void DELETE(char* filename, char* data, char* table, char *column){
         }
     }
     fclose(fa);
+}
+
+void UPDATE(char* filename, char* data, char* table, char *column){
+
+}
+void CREATE_TABLE(){
+    
 }
